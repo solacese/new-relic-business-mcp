@@ -1,0 +1,200 @@
+{
+  "scenarioId": "success-flow",
+  "businessKey": {
+    "type": "SalesOrder",
+    "value": "12345"
+  },
+  "traceId": "trace-salesorder-12345",
+  "summary": "Sales order 12345 moved from APIM to ERP and completed successfully.",
+  "spans": [
+    {
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-apim-12345",
+      "service": "APIM",
+      "name": "POST /sales-orders",
+      "timestamp": "2026-03-18T09:00:00.000Z",
+      "durationMs": 950,
+      "status": "ok",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    },
+    {
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-solace-12345",
+      "parentSpanId": "span-apim-12345",
+      "service": "Solace",
+      "name": "Publish sales-order.created",
+      "timestamp": "2026-03-18T09:00:01.100Z",
+      "durationMs": 210,
+      "status": "ok",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    },
+    {
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-mule-consume-12345",
+      "parentSpanId": "span-solace-12345",
+      "service": "MuleSoft",
+      "name": "Consume sales-order.created",
+      "timestamp": "2026-03-18T09:00:03.000Z",
+      "durationMs": 520,
+      "status": "ok",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    },
+    {
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-mule-transform-12345",
+      "parentSpanId": "span-mule-consume-12345",
+      "service": "MuleSoft",
+      "name": "Transform sales order payload",
+      "timestamp": "2026-03-18T09:00:04.100Z",
+      "durationMs": 340,
+      "status": "ok",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    },
+    {
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-erp-create-12345",
+      "parentSpanId": "span-mule-transform-12345",
+      "service": "ERP",
+      "name": "Create ERP sales order",
+      "timestamp": "2026-03-18T09:00:07.000Z",
+      "durationMs": 880,
+      "status": "ok",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    },
+    {
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-erp-ack-12345",
+      "parentSpanId": "span-erp-create-12345",
+      "service": "ERP",
+      "name": "ERP processing acknowledgement",
+      "timestamp": "2026-03-18T09:00:08.400Z",
+      "durationMs": 90,
+      "status": "ok",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "logId": "log-apim-12345",
+      "timestamp": "2026-03-18T09:00:00.200Z",
+      "service": "APIM",
+      "severity": "info",
+      "message": "Received SalesOrder=12345 request and started order intake flow.",
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-apim-12345",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    },
+    {
+      "logId": "log-solace-12345",
+      "timestamp": "2026-03-18T09:00:01.300Z",
+      "service": "Solace",
+      "severity": "info",
+      "message": "Published sales-order.created for SalesOrder=12345 to integration topic.",
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-solace-12345",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    },
+    {
+      "logId": "log-mule-12345-1",
+      "timestamp": "2026-03-18T09:00:03.400Z",
+      "service": "MuleSoft",
+      "severity": "info",
+      "message": "Consumed SalesOrder=12345 event from Solace queue.",
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-mule-consume-12345",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    },
+    {
+      "logId": "log-mule-12345-2",
+      "timestamp": "2026-03-18T09:00:04.500Z",
+      "service": "MuleSoft",
+      "severity": "info",
+      "message": "Transformed sales order 12345 into ERP payload.",
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-mule-transform-12345",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    },
+    {
+      "logId": "log-erp-12345-1",
+      "timestamp": "2026-03-18T09:00:07.500Z",
+      "service": "ERP",
+      "severity": "info",
+      "message": "ERP created sales order 12345 successfully.",
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-erp-create-12345",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    },
+    {
+      "logId": "log-erp-12345-2",
+      "timestamp": "2026-03-18T09:00:08.450Z",
+      "service": "ERP",
+      "severity": "info",
+      "message": "SalesOrder=12345 completed end-to-end processing.",
+      "traceId": "trace-salesorder-12345",
+      "spanId": "span-erp-ack-12345",
+      "attributes": {
+        "SalesOrder": "12345",
+        "correlationId": "corr-12345"
+      }
+    }
+  ],
+  "entities": [
+    {
+      "entityId": "entity-apim",
+      "name": "APIM",
+      "type": "SERVICE",
+      "service": "APIM"
+    },
+    {
+      "entityId": "entity-solace",
+      "name": "Solace",
+      "type": "SERVICE",
+      "service": "Solace"
+    },
+    {
+      "entityId": "entity-mulesoft",
+      "name": "MuleSoft",
+      "type": "SERVICE",
+      "service": "MuleSoft"
+    },
+    {
+      "entityId": "entity-erp",
+      "name": "ERP",
+      "type": "SERVICE",
+      "service": "ERP"
+    }
+  ]
+}

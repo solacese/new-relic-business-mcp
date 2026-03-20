@@ -1,0 +1,155 @@
+{
+  "scenarioId": "failure-flow",
+  "businessKey": {
+    "type": "SalesOrder",
+    "value": "98421"
+  },
+  "traceId": "trace-salesorder-98421",
+  "summary": "Sales order 98421 stopped in MuleSoft during transformation and never reached ERP.",
+  "spans": [
+    {
+      "traceId": "trace-salesorder-98421",
+      "spanId": "span-apim-98421",
+      "service": "APIM",
+      "name": "POST /sales-orders",
+      "timestamp": "2026-03-18T11:30:00.000Z",
+      "durationMs": 870,
+      "status": "ok",
+      "attributes": {
+        "SalesOrder": "98421",
+        "correlationId": "corr-98421"
+      }
+    },
+    {
+      "traceId": "trace-salesorder-98421",
+      "spanId": "span-solace-98421",
+      "parentSpanId": "span-apim-98421",
+      "service": "Solace",
+      "name": "Publish sales-order.created",
+      "timestamp": "2026-03-18T11:30:01.050Z",
+      "durationMs": 180,
+      "status": "ok",
+      "attributes": {
+        "SalesOrder": "98421",
+        "correlationId": "corr-98421"
+      }
+    },
+    {
+      "traceId": "trace-salesorder-98421",
+      "spanId": "span-mule-consume-98421",
+      "parentSpanId": "span-solace-98421",
+      "service": "MuleSoft",
+      "name": "Consume sales-order.created",
+      "timestamp": "2026-03-18T11:30:02.900Z",
+      "durationMs": 600,
+      "status": "ok",
+      "attributes": {
+        "SalesOrder": "98421",
+        "correlationId": "corr-98421"
+      }
+    },
+    {
+      "traceId": "trace-salesorder-98421",
+      "spanId": "span-mule-transform-98421",
+      "parentSpanId": "span-mule-consume-98421",
+      "service": "MuleSoft",
+      "name": "Transform sales order payload",
+      "timestamp": "2026-03-18T11:30:04.100Z",
+      "durationMs": 410,
+      "status": "error",
+      "attributes": {
+        "SalesOrder": "98421",
+        "correlationId": "corr-98421",
+        "error.class": "TransformationValidationError"
+      }
+    }
+  ],
+  "logs": [
+    {
+      "logId": "log-apim-98421",
+      "timestamp": "2026-03-18T11:30:00.150Z",
+      "service": "APIM",
+      "severity": "info",
+      "message": "Received SalesOrder=98421 request and started order intake flow.",
+      "traceId": "trace-salesorder-98421",
+      "spanId": "span-apim-98421",
+      "attributes": {
+        "SalesOrder": "98421",
+        "correlationId": "corr-98421"
+      }
+    },
+    {
+      "logId": "log-solace-98421",
+      "timestamp": "2026-03-18T11:30:01.250Z",
+      "service": "Solace",
+      "severity": "info",
+      "message": "Published sales-order.created for SalesOrder=98421 to integration topic.",
+      "traceId": "trace-salesorder-98421",
+      "spanId": "span-solace-98421",
+      "attributes": {
+        "SalesOrder": "98421",
+        "correlationId": "corr-98421"
+      }
+    },
+    {
+      "logId": "log-mule-98421-1",
+      "timestamp": "2026-03-18T11:30:03.200Z",
+      "service": "MuleSoft",
+      "severity": "info",
+      "message": "Consumed SalesOrder=98421 event from Solace queue.",
+      "traceId": "trace-salesorder-98421",
+      "spanId": "span-mule-consume-98421",
+      "attributes": {
+        "SalesOrder": "98421",
+        "correlationId": "corr-98421"
+      }
+    },
+    {
+      "logId": "log-mule-98421-2",
+      "timestamp": "2026-03-18T11:30:04.450Z",
+      "service": "MuleSoft",
+      "severity": "error",
+      "message": "Transformation failed for SalesOrder=98421 because customerCode was missing.",
+      "traceId": "trace-salesorder-98421",
+      "spanId": "span-mule-transform-98421",
+      "attributes": {
+        "SalesOrder": "98421",
+        "correlationId": "corr-98421",
+        "error.class": "TransformationValidationError"
+      }
+    },
+    {
+      "logId": "log-mule-98421-3",
+      "timestamp": "2026-03-18T11:30:05.000Z",
+      "service": "MuleSoft",
+      "severity": "warn",
+      "message": "No ERP handoff was attempted after SalesOrder=98421 transformation failure.",
+      "traceId": "trace-salesorder-98421",
+      "spanId": "span-mule-transform-98421",
+      "attributes": {
+        "SalesOrder": "98421",
+        "correlationId": "corr-98421"
+      }
+    }
+  ],
+  "entities": [
+    {
+      "entityId": "entity-apim",
+      "name": "APIM",
+      "type": "SERVICE",
+      "service": "APIM"
+    },
+    {
+      "entityId": "entity-solace",
+      "name": "Solace",
+      "type": "SERVICE",
+      "service": "Solace"
+    },
+    {
+      "entityId": "entity-mulesoft",
+      "name": "MuleSoft",
+      "type": "SERVICE",
+      "service": "MuleSoft"
+    }
+  ]
+}

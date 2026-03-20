@@ -1,0 +1,50 @@
+{
+  "name": "business-investigation-mcp",
+  "version": "0.1.0",
+  "description": "A public starter MCP server that adds business-semantic investigation workflows on top of New Relic observability data.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "files": [
+    "dist",
+    "sample-data",
+    "README.md",
+    "ARCHITECTURE.md",
+    "SECURITY.md",
+    "LICENSE",
+    "mcp-client-config.json"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "rm -rf dist && tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "lint": "eslint src tests --ext .ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "mcp",
+    "new-relic",
+    "business-investigation",
+    "typescript",
+    "observability"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.5.0",
+    "eslint": "^10.0.3",
+    "globals": "^17.4.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.1",
+    "vitest": "^4.1.0"
+  }
+}
