@@ -2,7 +2,10 @@
   "servers": {
     "business-investigation-mcp": {
       "type": "http",
-      "url": "http://localhost:3000/mcp"
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "x-api-key": "replace-with-mcp-api-key-if-enabled"
+      }
     }
   }
 }

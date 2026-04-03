@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
 
@@ -72,6 +73,65 @@ function sendJson(
   res.end(JSON.stringify(payload));
 }
 
+function getHeaderValue(header: string | string[] | undefined): string | undefined {
+  if (Array.isArray(header)) {
+    return header[0];
+  }
+
+  return header;
+}
+
+function extractApiKey(req: IncomingMessage): string | undefined {
+  const directHeader = getHeaderValue(req.headers["x-api-key"]);
+
+  if (directHeader && directHeader.trim().length > 0) {
+    return directHeader.trim();
+  }
+
+  const authorization = getHeaderValue(req.headers.authorization);
+
+  if (!authorization) {
+    return undefined;
+  }
+
+  const bearerMatch = authorization.match(/^Bearer\s+(.+)$/i);
+  return bearerMatch?.[1]?.trim() || undefined;
+}
+
+function safeEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left, "utf8");
+  const rightBuffer = Buffer.from(right, "utf8");
+
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function isAuthorized(req: IncomingMessage, config: AppConfig): boolean {
+  const expectedApiKey = config.auth.apiKey;
+
+  if (!expectedApiKey) {
+    return true;
+  }
+
+  const receivedApiKey = extractApiKey(req);
+  return receivedApiKey ? safeEqual(receivedApiKey, expectedApiKey) : false;
+}
+
+function sendUnauthorized(res: ServerResponse): void {
+  res.setHeader("WWW-Authenticate", 'Bearer realm="business-investigation-mcp"');
+  sendJson(res, 401, {
+    jsonrpc: "2.0",
+    error: {
+      code: -32001,
+      message: "Unauthorized. Provide x-api-key or Authorization: Bearer <token>."
+    },
+    id: null
+  });
+}
+
 async function readJsonBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
 
@@ -138,6 +198,11 @@ async function routeRequest(
 
   if (url.pathname !== "/mcp") {
     sendJson(res, 404, { error: "Not found." });
+    return;
+  }
+
+  if (!isAuthorized(req, deps.config)) {
+    sendUnauthorized(res);
     return;
   }
 

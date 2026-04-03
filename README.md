@@ -8,7 +8,7 @@ It is intentionally narrow:
 
 - It exposes 4 business-semantic tools.
 - It hides raw observability primitives from the LLM.
-- It runs out of the box with deterministic mock data.
+- It runs out of the box with generated fake mock data.
 - It includes a lightweight, credible New Relic integration path without turning into a generic API wrapper.
 
 ## Why this exists
@@ -59,7 +59,7 @@ This starter exposes exactly these tools:
 | `find_business_traces` | Find likely trace IDs, systems involved, and time range for a business key. |
 | `get_trace_timeline` | Reconstruct an ordered end-to-end timeline for a trace from spans and logs. |
 | `fetch_business_logs` | Return logs linked directly or indirectly to the business transaction. |
-| `explain_failure_point` | Identify the most likely break point with supporting evidence. |
+| `explain_failure_point` | Identify the most likely break point with supporting evidence. On successful traces it returns `failureDetected: false` and a no-failure explanation. |
 
 It does **not** expose a raw NRQL tool. That is deliberate. The goal is to keep the LLM working at the business investigation layer.
 
@@ -102,6 +102,7 @@ tests/
 ```
 
 - `MockBackend` is the default and fully working path.
+- In mock mode, the server synthesizes fake traces, spans, and logs from the sample templates so you can demo arbitrary business keys without real telemetry.
 - `NewRelicBackend` is intentionally lightweight but real.
 - `InvestigationService` owns correlation, timeline reconstruction, and failure inference.
 - Tool handlers are thin MCP wrappers around that service.
@@ -123,6 +124,13 @@ npm run dev
 
 The default `.env.example` already uses `BACKEND_MODE=mock`, so no credentials are required.
 
+If you want to protect the MCP endpoint itself, set `MCP_API_KEY`. When configured, `/mcp` accepts either:
+
+- `x-api-key: <your key>`
+- `Authorization: Bearer <your key>`
+
+The `/healthz` endpoint remains unauthenticated.
+
 The server starts on:
 
 - MCP endpoint: `http://localhost:3000/mcp`
@@ -137,7 +145,10 @@ This repo includes a sample [`mcp-client-config.json`](./mcp-client-config.json)
   "servers": {
     "business-investigation-mcp": {
       "type": "http",
-      "url": "http://localhost:3000/mcp"
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "x-api-key": "replace-with-mcp-api-key-if-enabled"
+      }
     }
   }
 }
@@ -159,9 +170,17 @@ docker build -t business-investigation-mcp .
 docker run --rm -p 3000:3000 business-investigation-mcp
 ```
 
+With MCP endpoint protection enabled:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e MCP_API_KEY=replace-me \
+  business-investigation-mcp
+```
+
 ## Mock data scenarios
 
-The repo ships with two deterministic scenarios under [`sample-data/`](./sample-data):
+The repo ships with two sample templates under [`sample-data/`](./sample-data):
 
 - Success flow: `SalesOrder=12345`
   - APIM receives the request
@@ -175,7 +194,7 @@ The repo ships with two deterministic scenarios under [`sample-data/`](./sample-
   - MuleSoft fails during transformation
   - no ERP continuation appears
 
-These scenarios include spans, logs, timestamps, parent-child relationships, and concise summaries so the 4 tools return deterministic outputs.
+In mock mode, the server uses these templates to generate fake traces, logs, and summaries. The seeded `SalesOrder=12345` and `SalesOrder=98421` flows remain stable for tests and demos, and other business keys are synthesized on demand.
 
 ## Example outputs
 
@@ -253,6 +272,7 @@ Example `explain_failure_point` result for `SalesOrder=98421`:
     "value": "98421"
   },
   "traceId": "trace-salesorder-98421",
+  "failureDetected": true,
   "likelyFailurePoint": {
     "service": "MuleSoft",
     "reason": "Transformation failed for SalesOrder=98421 because customerCode was missing. Transform sales order payload recorded an error span. No downstream ERP span appears after MuleSoft.",
@@ -298,6 +318,7 @@ Example `fetch_business_logs` result for `SalesOrder=98421`:
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `BACKEND_MODE` | `mock` | `mock` or `newrelic` |
+| `MCP_API_KEY` | empty | Optional API key that protects the `/mcp` endpoint |
 | `NEW_RELIC_REGION` | `US` | `US` or `EU` |
 | `NEW_RELIC_USER_API_KEY` | empty | Required for `newrelic` mode |
 | `NEW_RELIC_ACCOUNT_ID` | empty | Required for `newrelic` mode |
@@ -370,7 +391,7 @@ A practical pilot can be considered successful if the team can:
 
 ## What is intentionally simplified
 
-- Mock mode uses fixed sample data and does not try to simulate real-time lookback windows against wall-clock time.
+- Mock mode generates fake demo data from local templates. It is suitable for demos and agent workflow development, not for validating real incidents.
 - The live adapter is generic, not customer-specific. Real teams should tune `BUSINESS_KEY_FIELD_CANDIDATES` and the correlation rules to match their telemetry.
 - The optional remote MCP usage is intentionally lightweight. This starter shows where discovery/data-access calls fit but does not try to mirror the entire official New Relic MCP surface.
 - Failure inference is heuristic by design: error logs, failed spans, and missing downstream continuation are combined into a clear explanation rather than a perfect causal model.
@@ -379,6 +400,7 @@ A practical pilot can be considered successful if the team can:
 ## Companion docs
 
 - [`ARCHITECTURE.md`](./ARCHITECTURE.md)
+- [`OBSERVABILITY_AGENT.md`](./OBSERVABILITY_AGENT.md)
 - [`SECURITY.md`](./SECURITY.md)
 - [`mcp-client-config.json`](./mcp-client-config.json)
 

@@ -13,6 +13,7 @@ const DEFAULT_FIELD_CANDIDATES = [
 
 const rawEnvSchema = z.object({
   BACKEND_MODE: z.enum(["mock", "newrelic"]).optional(),
+  MCP_API_KEY: z.string().optional(),
   NEW_RELIC_REGION: z.enum(["US", "EU"]).optional(),
   NEW_RELIC_USER_API_KEY: z.string().optional(),
   NEW_RELIC_ACCOUNT_ID: z.string().optional(),
@@ -32,6 +33,9 @@ export type AppConfig = {
   port: number;
   defaultLookbackMinutes: number;
   backendMode: BackendMode;
+  auth: {
+    apiKey?: string;
+  };
   newRelic: {
     region: NewRelicRegion;
     userApiKey?: string;
@@ -96,6 +100,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       DEFAULT_LOOKBACK_MINUTES
     ),
     backendMode,
+    auth: {
+      apiKey: raw.MCP_API_KEY?.trim() || undefined
+    },
     newRelic: {
       region,
       userApiKey: raw.NEW_RELIC_USER_API_KEY?.trim() || undefined,

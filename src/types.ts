@@ -135,6 +135,7 @@ export type FetchBusinessLogsResult = z.infer<typeof fetchBusinessLogsResultSche
 export const explainFailurePointResultSchema = z.object({
   businessKey: businessKeySchema,
   traceId: z.string().min(1),
+  failureDetected: z.boolean(),
   likelyFailurePoint: failurePointSchema,
   confidence: z.number().min(0).max(1),
   summary: z.string().min(1),

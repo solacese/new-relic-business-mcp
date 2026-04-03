@@ -18,4 +18,12 @@ describe("loadConfig", () => {
       })
     ).toThrow(/NEW_RELIC_USER_API_KEY/);
   });
+
+  it("loads the optional MCP API key", () => {
+    const config = loadConfig({
+      MCP_API_KEY: "top-secret"
+    });
+
+    expect(config.auth.apiKey).toBe("top-secret");
+  });
 });

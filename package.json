@@ -11,6 +11,8 @@
     "sample-data",
     "README.md",
     "ARCHITECTURE.md",
+    "OBSERVABILITY_AGENT.md",
+    "AGENT_PROMPT.md",
     "SECURITY.md",
     "LICENSE",
     "mcp-client-config.json"

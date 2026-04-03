@@ -5,7 +5,12 @@ import type { InvestigationService } from "../services/investigationService.js";
 import { getTraceTimelineResultSchema } from "../types.js";
 
 const inputSchema = z.object({
-  traceId: z.string().min(1).describe("Trace identifier returned by find_business_traces."),
+  traceId: z
+    .string()
+    .min(1)
+    .describe(
+      "Trace identifier returned by find_business_traces. The server also accepts forgiving aliases such as SalesOrder=12345 or SalesOrder-12345."
+    ),
   lookbackMinutes: z
     .number()
     .int()
@@ -23,7 +28,7 @@ export function registerGetTraceTimelineTool(
     {
       title: "Get Trace Timeline",
       description:
-        "Reconstruct an ordered end-to-end timeline for a trace using spans and related logs.",
+        "Reconstruct an ordered end-to-end timeline for a trace using spans and related logs. If needed, the server can resolve business-key-style trace references.",
       inputSchema,
       outputSchema: getTraceTimelineResultSchema,
       annotations: {

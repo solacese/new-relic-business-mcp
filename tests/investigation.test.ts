@@ -63,7 +63,67 @@ describe("InvestigationService", () => {
       }
     });
 
+    expect(result.failureDetected).toBe(true);
     expect(result.likelyFailurePoint.service).toBe("MuleSoft");
     expect(result.likelyFailurePoint.missingExpectedService).toBe("ERP");
+  });
+
+  it("explain_failure_point reports no failure for a successful trace", async () => {
+    const service = createService();
+
+    const result = await service.explainFailurePoint({
+      businessKey: {
+        type: "SalesOrder",
+        value: "12345"
+      }
+    });
+
+    expect(result.failureDetected).toBe(false);
+    expect(result.likelyFailurePoint.service).toBe("ERP");
+    expect(result.likelyFailurePoint.reason).toContain("No failure evidence detected");
+    expect(result.summary).toContain("No failure point detected");
+  });
+
+  it("synthesizes fake traces for unknown business keys", async () => {
+    const service = createService();
+
+    const traces = await service.findBusinessTraces({
+      businessKey: {
+        type: "SalesOrder",
+        value: "55555"
+      }
+    });
+
+    expect(traces.matches[0]?.traceId).toBe("trace-salesorder-55555");
+    expect(traces.matches[0]?.summary).toContain("fake demo data");
+
+    const timeline = await service.getTraceTimeline({
+      traceId: "trace-salesorder-55555"
+    });
+
+    expect(timeline.systemsInvolved[0]).toBe("APIM");
+    expect(timeline.summary).toContain("Trace trace-salesorder-55555");
+  });
+
+  it("resolves business-key-like aliases in get_trace_timeline", async () => {
+    const service = createService();
+
+    const timeline = await service.getTraceTimeline({
+      traceId: "SalesOrder-55555"
+    });
+
+    expect(timeline.traceId).toBe("trace-salesorder-55555");
+    expect(timeline.systemsInvolved).toEqual(["APIM", "Solace", "MuleSoft", "ERP"]);
+  });
+
+  it("falls back from messy references to the best matching trace", async () => {
+    const service = createService();
+
+    const timeline = await service.getTraceTimeline({
+      traceId: "abc123-trace-sales-98421"
+    });
+
+    expect(timeline.traceId).toBe("trace-salesorder-98421");
+    expect(timeline.summary).toContain("fails in MuleSoft");
   });
 });

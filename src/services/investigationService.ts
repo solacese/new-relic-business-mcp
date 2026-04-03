@@ -17,9 +17,150 @@ import type {
 } from "../types.js";
 
 const EXPECTED_REFERENCE_FLOW = ["APIM", "Solace", "MuleSoft", "ERP"] as const;
+const COMMON_BUSINESS_KEY_TYPES = [
+  "SalesOrder",
+  "OrderId",
+  "TransactionId",
+  "CorrelationId"
+] as const;
 
 function uniqueStrings(values: string[]): string[] {
   return [...new Set(values)];
+}
+
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function normalizeBusinessKeyType(type: string): string {
+  const compact = type.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+
+  switch (compact) {
+    case "salesorder":
+    case "sales":
+      return "SalesOrder";
+    case "orderid":
+    case "order":
+      return "OrderId";
+    case "transactionid":
+    case "transaction":
+      return "TransactionId";
+    case "correlationid":
+    case "correlation":
+      return "CorrelationId";
+    default: {
+      const words = type
+        .split(/[^a-zA-Z0-9]+/)
+        .map((word) => word.trim())
+        .filter(Boolean);
+
+      return words.length > 0
+        ? words.map((word) => word[0]!.toUpperCase() + word.slice(1)).join("")
+        : type;
+    }
+  }
+}
+
+function isLikelyBusinessKeyType(type: string): boolean {
+  const compact = type.replace(/[^a-zA-Z]/g, "");
+
+  return compact.length > 0 && !/[0-9]/.test(type);
+}
+
+function parseBusinessKeyReference(reference: string): BusinessKey | undefined {
+  const trimmed = reference.trim();
+  const withoutTracePrefix = trimmed.replace(/^trace[-:_\s]*/i, "");
+
+  const explicitMatch = withoutTracePrefix.match(
+    /([A-Za-z][A-Za-z0-9 _-]*)\s*[:=]\s*([A-Za-z0-9][A-Za-z0-9_-]*)/
+  );
+
+  if (explicitMatch?.[1] && explicitMatch[2] && isLikelyBusinessKeyType(explicitMatch[1])) {
+    return {
+      type: normalizeBusinessKeyType(explicitMatch[1]),
+      value: explicitMatch[2]
+    };
+  }
+
+  const hyphenatedMatch = withoutTracePrefix.match(
+    /([A-Za-z][A-Za-z0-9 _-]*?)[-_ ]+([A-Za-z0-9][A-Za-z0-9_-]*)$/
+  );
+
+  if (hyphenatedMatch?.[1] && hyphenatedMatch[2] && isLikelyBusinessKeyType(hyphenatedMatch[1])) {
+    return {
+      type: normalizeBusinessKeyType(hyphenatedMatch[1]),
+      value: hyphenatedMatch[2]
+    };
+  }
+
+  return undefined;
+}
+
+function extractLikelyBusinessValue(reference: string): string | undefined {
+  const trimmed = reference.trim();
+  const candidates = trimmed.split(/[^A-Za-z0-9]+/).filter(Boolean);
+
+  if (!candidates || candidates.length === 0) {
+    return undefined;
+  }
+
+  const last = candidates.at(-1);
+
+  return last && /[0-9]/.test(last) ? last : undefined;
+}
+
+function buildTraceIdCandidates(reference: string): string[] {
+  const trimmed = reference.trim();
+  const withoutTracePrefix = trimmed.replace(/^trace[-:_\s]*/i, "");
+  const candidates = [trimmed];
+  const slug = slugify(withoutTracePrefix);
+
+  if (slug.length > 0) {
+    candidates.push(`trace-${slug}`);
+  }
+
+  return uniqueStrings(candidates.filter(Boolean));
+}
+
+function buildBusinessKeyGuesses(reference: string): BusinessKey[] {
+  const parsed = parseBusinessKeyReference(reference);
+  const likelyValue = extractLikelyBusinessValue(reference);
+  const lowerReference = reference.toLowerCase();
+  const guessedTypes = [...COMMON_BUSINESS_KEY_TYPES];
+
+  if (lowerReference.includes("sales")) {
+    guessedTypes.unshift("SalesOrder");
+  }
+
+  if (lowerReference.includes("order")) {
+    guessedTypes.unshift("OrderId");
+  }
+
+  if (lowerReference.includes("corr")) {
+    guessedTypes.unshift("CorrelationId");
+  }
+
+  const guesses = new Map<string, BusinessKey>();
+
+  if (parsed) {
+    guesses.set(`${parsed.type}:${parsed.value}`, parsed);
+  }
+
+  if (likelyValue) {
+    for (const type of guessedTypes) {
+      const guess = {
+        type,
+        value: likelyValue
+      };
+      guesses.set(`${guess.type}:${guess.value}`, guess);
+    }
+  }
+
+  return [...guesses.values()];
 }
 
 function timeRangeFromRecords(spans: TraceSpanRecord[], logs: TraceLogRecord[]): TimeRange {
@@ -206,6 +347,52 @@ export class InvestigationService {
     };
   }
 
+  private async fetchTraceRecords(
+    traceId: string,
+    options: LookbackOptions
+  ): Promise<{ traceId: string; spans: TraceSpanRecord[]; logs: TraceLogRecord[] } | undefined> {
+    const [spans, logs] = await Promise.all([
+      this.backend.getTraceSpans(traceId, options),
+      this.backend.getTraceLogs(traceId, options)
+    ]);
+
+    if (spans.length === 0 && logs.length === 0) {
+      return undefined;
+    }
+
+    return { traceId, spans, logs };
+  }
+
+  private async resolveTraceReference(
+    traceReference: string,
+    options: LookbackOptions
+  ): Promise<{ traceId: string; spans: TraceSpanRecord[]; logs: TraceLogRecord[] } | undefined> {
+    for (const candidateTraceId of buildTraceIdCandidates(traceReference)) {
+      const records = await this.fetchTraceRecords(candidateTraceId, options);
+
+      if (records) {
+        return records;
+      }
+    }
+
+    for (const businessKey of buildBusinessKeyGuesses(traceReference)) {
+      const matches = await this.backend.searchByBusinessKey(businessKey, options);
+      const bestMatch = matches[0];
+
+      if (!bestMatch) {
+        continue;
+      }
+
+      const records = await this.fetchTraceRecords(bestMatch.traceId, options);
+
+      if (records) {
+        return records;
+      }
+    }
+
+    return undefined;
+  }
+
   public async findBusinessTraces(input: {
     businessKey: BusinessKey;
     lookbackMinutes?: number;
@@ -234,24 +421,25 @@ export class InvestigationService {
     lookbackMinutes?: number;
   }): Promise<GetTraceTimelineResult> {
     const options = this.normalizeLookback(input.lookbackMinutes);
-    const [spans, logs] = await Promise.all([
-      this.backend.getTraceSpans(input.traceId, options),
-      this.backend.getTraceLogs(input.traceId, options)
-    ]);
+    const resolved = await this.resolveTraceReference(input.traceId, options);
 
-    if (spans.length === 0 && logs.length === 0) {
-      throw new Error(`No span or log records found for trace ${input.traceId}.`);
+    if (!resolved) {
+      throw new Error(
+        `No span or log records found for trace ${input.traceId}. Call find_business_traces first or pass a business-key-like reference such as SalesOrder=12345.`
+      );
     }
+
+    const { traceId, spans, logs } = resolved;
 
     const systemsInvolved = servicesInChronologicalOrder(spans, logs);
     const evidence = flattenEvidence([], logs, spans);
 
     return {
-      traceId: input.traceId,
+      traceId,
       systemsInvolved,
       timeRange: timeRangeFromRecords(spans, logs),
       timeline: buildTimeline(spans, logs),
-      summary: summarizeTrace(input.traceId, systemsInvolved, spans),
+      summary: summarizeTrace(traceId, systemsInvolved, spans),
       evidence
     };
   }
@@ -318,24 +506,43 @@ export class InvestigationService {
       .filter((span) => span.status === "ok")
       .sort((left, right) => right.timestamp.localeCompare(left.timestamp))[0];
     const missingService = expectedMissingService(systems);
+    const terminalService = systems[systems.length - 1] ?? "unknown";
+    const failureDetected = Boolean(errorLog || failedSpan || missingService);
 
-    const service = failedSpan?.service ?? errorLog?.service ?? systems[systems.length - 1] ?? "unknown";
+    const service = failureDetected
+      ? failedSpan?.service ?? errorLog?.service ?? terminalService
+      : terminalService;
     const reasonParts = [
       errorLog ? errorLog.message : undefined,
       failedSpan ? `${failedSpan.name} recorded an error span.` : undefined,
       missingService ? `No downstream ${missingService} span appears after ${service}.` : undefined
     ].filter((value): value is string => Boolean(value));
-    const confidence =
-      errorLog && missingService ? 0.96 : errorLog || failedSpan ? 0.88 : 0.7;
+    const lastLog = [...logs].sort((left, right) => right.timestamp.localeCompare(left.timestamp))[0];
+    const reason = failureDetected
+      ? reasonParts.join(" ")
+      : systems.length > 0
+        ? `No failure evidence detected. The trace reaches ${service} and completes successfully.`
+        : "No failure evidence detected for the requested business transaction.";
+    const confidence = failureDetected
+      ? errorLog && missingService
+        ? 0.96
+        : 0.88
+      : 0.95;
 
     const likelyFailurePoint = {
       service,
-      reason: reasonParts.join(" "),
+      reason,
       lastSuccessfulStep: lastSuccessfulSpan
         ? `${lastSuccessfulSpan.service}: ${lastSuccessfulSpan.name}`
         : undefined,
-      missingExpectedService: missingService,
-      supportingLogIds: errorLog ? [errorLog.logId] : [],
+      missingExpectedService: failureDetected ? missingService : undefined,
+      supportingLogIds: failureDetected
+        ? errorLog
+          ? [errorLog.logId]
+          : []
+        : lastLog
+          ? [lastLog.logId]
+          : [],
       confidence
     };
     const evidence = flattenEvidence(bestCandidate.evidence, logs, spans);
@@ -343,9 +550,12 @@ export class InvestigationService {
     return {
       businessKey: input.businessKey,
       traceId: bestCandidate.traceId,
+      failureDetected,
       likelyFailurePoint,
       confidence,
-      summary: `The most likely failure point for ${input.businessKey.type}=${input.businessKey.value} is ${service}.`,
+      summary: failureDetected
+        ? `The most likely failure point for ${input.businessKey.type}=${input.businessKey.value} is ${service}.`
+        : `No failure point detected for ${input.businessKey.type}=${input.businessKey.value}. The flow completed successfully.`,
       evidence
     };
   }
